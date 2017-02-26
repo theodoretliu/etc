@@ -207,26 +207,28 @@ def fair_vale(e):
 
     owned_shares = e.positions.get("VALE", 0)
     if owned_shares > 9:
-        id_ = e.sell("VALE", fair, 9)
+        id_ = e.sell("VALE", fair, 5)
         e.vale_ordered_sells[id_] = fair
     elif owned_shares < -9:
-        id_ = e.buy("VALE", fair, 9)
+        id_ = e.buy("VALE", fair, 5)
         e.vale_ordered_buys[id_] = fair
 
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
 
-    for o in buy_offers:
-        if o[0] < (fair - 1):
-            id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
-            e.vale_ordered_buys[id_] = fair
-            break
+    if owned_shares < 10:
+        for o in buy_offers:
+            if o[0] < (fair - 1):
+                id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
+                e.vale_ordered_buys[id_] = fair
+                break
 
-    for o in sell_offers:
-        if o[0] > (fair + 1):
-            id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
-            e.vale_ordered_sells[id_] = fair
-            break
+    if owned_shares > -10:
+        for o in sell_offers:
+            if o[0] > (fair + 1):
+                id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
+                e.vale_ordered_sells[id_] = fair
+                break
 
 
 def vale_valbz(exchange):
