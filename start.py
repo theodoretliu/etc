@@ -211,14 +211,6 @@ def vale_valbz(exchange):
             exchange.sell("VALE", vale_buy[3], 1)
 
 def bond_trade(exchange):
-    state = exchange.positions.get("BOND")
-    if state is None:
-        return
-
-    if state == 0:
-        exchange.buy("BOND", 999, 1)
-    elif state > 0:
-        exchange.sell("BOND", 1001, 1)
     pos = exchange.positions.get("BOND")
     if pos is None:
         return
