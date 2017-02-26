@@ -44,7 +44,6 @@ class Exchange:
         self.connect()
         while True:
             dat = self.read()
-            print(dat, file=sys.stderr)
             if dat is None:
                 self.connect()
             else:
