@@ -206,7 +206,24 @@ def trade(exchange):
     exchange.sell(sell_symb, MAX - 1, 1)
     exchange.buy(buy_symb, MIN + 1, 1)
 
+    for sym in self.positions:
+        quantity = self.positions.get(sym)
 
+        if quantity is None:
+            continue
+
+        if quantity >= 50:
+            temp = exchange.buys.get(sym)
+
+            if temp is not None:
+                exchange.sell(sym, temp[0], 50)
+
+        if quantity <= -50:
+            temp = exchange.sells.get(sym)
+
+            if temp is not None:
+                exchange.buy(sym, temp[0], 50)
+                
 def main():
     # e = Exchange("localhost")
     from threading import Thread, Timer
