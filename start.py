@@ -190,11 +190,21 @@ def bond_trade(exchange):
             last = pos
 """
 
+def cancel_all(exchange, sym_cancel):
+    cancel_ids = []
+    for o_id, (_, sym, _, _) in exchange.orders_dict.items():
+        if sym == sym_cancel:
+            cancel_ids.append(o_id)
+
+    for i in cancel_ids:
+        exchange.cancel(i)
+
+
 def trade(exchange):
-    MIN = float('inf')
-    MAX = -float('inf')
-    buy_symb = ""
-    sell_symb = ""
+    # MIN = float('inf')
+    # MAX = -float('inf')
+    # buy_symb = ""
+    # sell_symb = ""
 
     for symb in exchange.buys:
         if symb == "XLF" or symb == "BOND":
@@ -215,21 +225,29 @@ def trade(exchange):
         if h_mean is None or l_mean is None:
             continue
 
-        if h_high > MAX:
-            MAX = h_high
-            sell_symb = symb
+        if l_low - h_high < 3:
+            cancel_all(exchange, symb)
+            continue
 
-        if l_low < MIN:
-            MIN = l_low
-            buy_symb = symb
+        exchange.buy(symb, h_high + 1, 1)
+        exchange.sell(symb, l_low - 1, 1)
 
-        print("Yo")
+    if len(exchange.orders_dict) > 100:
+        exchange.cancel(min(exchange.order_dict))
+        #     MAX = h_high
+        #     sell_symb = symb
 
-    if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
-        return
+        # if l_low < MIN:
+        #     MIN = l_low
+        #     buy_symb = symb
 
-    exchange.sell(sell_symb, MAX - 1, 1)
-    exchange.buy(buy_symb, MIN + 1, 1)
+        # print("Yo")
+
+    # if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
+    #     return
+
+    # exchange.sell(sell_symb, MAX - 1, 1)
+    # exchange.buy(buy_symb, MIN + 1, 1)
 
     # for sym in exchange.positions:
     #     quantity = exchange.positions.get(sym)
@@ -261,11 +279,11 @@ def threading_wrapper(func, exchange, interval):
 
 def main():
     # e = Exchange("localhost")
-    e = Exchange("production")
+    e = Exchange("test-exch-BIGBOARDTRIO")
 
-    threading_wrapper(bond_trade, e, 0.03).start()
-    #threading_wrapper(trade, e, 0.08).start()
-    threading_wrapper(order_pruning, e, 0.1).start()
+    #threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(trade, e, 0.1).start()
+    #threading_wrapper(order_pruning, e, 0.1).start()
     e.run()
 
 
