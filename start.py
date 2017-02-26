@@ -196,6 +196,8 @@ def vale_valbz(exchange):
     vale_sell = exchange.sells.get("VALE")
     valbz_sell = exchange.sells.get("VALBZ")
 
+    if vale_buy is None or valbz_buy is None or vale_sell is None or valbz_sell is None:
+        return
     # mean, low, num, high, num (self, order_id, sym, direction, size)
 
     state_vale = exchange.positions.get("VALE")
@@ -204,7 +206,10 @@ def vale_valbz(exchange):
     if state_vale is None or state_valbz is None:
         return
 
+    print(state_vale)
+    print(state_valbz)
     if vale_sell[1] + 10 < valbz_buy[3]:
+        print("yes")
         if state_vale < 10:
             exchange.buy("VALE", vale_sell[1], 1)
         if state_vale > 0:
@@ -213,6 +218,7 @@ def vale_valbz(exchange):
             exchange.sell("VALBZ", valbz_buy[3], 1)
 
     elif valbz_sell[1] + 10 < vale_buy[3]:
+        print("no")
         if state_valbz < 10:
             exchange.buy("VALBZ", vale_sell[1], 1)
         if state_valbz > 0:
@@ -265,9 +271,9 @@ def trade(exchange):
     # sell_symb = ""
 
     for symb in exchange.buys:
-        if symb == "XLF" or symb == "BOND":
+        if symb != "VALE":
             continue
-
+        cancel_all(exchange, symb)
         high = exchange.buys.get(symb)
         low = exchange.sells.get(symb)
 
@@ -284,7 +290,7 @@ def trade(exchange):
             continue
 
         if l_low - h_high < 3:
-            cancel_all(exchange, symb)
+            # cancel_all(exchange, symb)
             continue
 
         exchange.buy(symb, h_high + 1, 1)
@@ -347,9 +353,10 @@ def main():
         e = Exchange("test-exch-BIGBOARDTRIO")
         print("--- TEST ---")
 
-    threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(vale_valbz, e, 0.03).start()
-    threading_wrapper(order_pruning, e, 5).start()
+    #threading_wrapper(bond_trade, e, 0.03).start()
+    #threading_wrapper(vale_valbz, e, 0.03).start()
+    #threading_wrapper(order_pruning, e, 5).start()
+    threading_wrapper(trade, e, 0.03).start()
     e.run()
 
 if __name__ == "__main__":
