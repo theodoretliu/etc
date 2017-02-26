@@ -29,6 +29,9 @@ class Exchange:
         self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
 
+        self.fullbook_sells = {}
+        self.fullbook_buys = {}
+
         self.our_sell_avg = {}  # SYM -> (sum, denom)
         self.our_buy_avg = {}  # SYM -> (sum, denom)
 
@@ -121,6 +124,7 @@ class Exchange:
                         max_o = tuple(max(dat[kind], key=lambda d: d[0]))
                         mean_o = sum(map(lambda d: d[0], dat[kind])) // len(dat[kind])
                     getattr(self, kind + "s")[sym] = (mean_o,) + min_o + max_o
+                    getattr(self, "fullbook_" + kind + "s")[sym] = dat[kind]
             elif msg_type == "reject":
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
