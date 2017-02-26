@@ -43,8 +43,8 @@ class Exchange:
 
         # valbz and vale state
         self.valbz_rolling = deque(maxlen=100)
-        self.vale_ordered_buys = set()  # (order_id, fair_val)
-        self.vale_ordered_sells = set()  # (order_id, fair_val)
+        self.vale_ordered_buys = {}  # order_id -> fair_val
+        self.vale_ordered_sells = {}  # order_id -> fair_val
 
         self.write({"type": "hello", "team": "BIGBOARDTRIO"})
 
@@ -185,12 +185,15 @@ def confirm(exchange, sym, direction):
 
 
 def fair_vale(e):
+    if len(e.valbz_rolling) == 0:
+        return
+
     fair = sum(e.valbz_rolling) / len(e.valbz_rolling)
 
     to_remove = (e.vale_ordered_buys.keys() | e.vale_ordered_sells.keys()) - e.orders_dict.keys()
     for r in to_remove:
-        e.vale_ordered_buys.discard(r)
-        e.vale_ordered_sells.discard(r)
+        e.vale_ordered_buys.pop(r, None)
+        e.vale_ordered_sells.pop(r, None)
 
     for id_, old_fair in e.vale_ordered_buys.items():
         diff = fair - old_fair
@@ -202,19 +205,19 @@ def fair_vale(e):
         if diff < -16 or diff > 1:
             e.cancel(id_)
 
-    buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reversed=True)
+    buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
 
     for o in buy_offers:
         if o[0] < (fair - 1):
             id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
-            e.vale_ordered_buys.add((id_, fair))
+            e.vale_ordered_buys[id_] = fair
             break
 
     for o in sell_offers:
         if o[0] > (fair + 1):
             id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
-            e.vale_ordered_sells.add((id_, fair))
+            e.vale_ordered_sells[id_] = fair
             break
 
 
@@ -389,8 +392,9 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(vale_valbz, e, 0.03).start()
+    # threading_wrapper(bond_trade, e, 0.03).start()
+    # threading_wrapper(vale_valbz, e, 0.03).start()
+    threading_wrapper(fair_vale, e, 0.06).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
