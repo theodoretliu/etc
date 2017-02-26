@@ -11,6 +11,7 @@ class Exchange:
         self.handler = []
         self.sock = None
         self.ID = 0
+        self.orders = []
 
     def connect(self):
         while True:
@@ -43,8 +44,13 @@ class Exchange:
         self.connect()
         while True:
             dat = self.read()
+            print(dat, file=sys.stderr)
             if dat is None:
                 self.connect()
+            else:
+                self.trade(dat)
+
+            time.sleep(0.001)
 
     def trade(self, obj):
         if obj["type"] != "book":
@@ -60,9 +66,6 @@ class Exchange:
             if buy[0] > MAX:
                 MAX = buy[0]
 
-        self.write({"type": "add", "order_id": self.count, "symbol": obj["symbol"], "dir": "BUY", "price": MAX - 1, "size": 1})
-
-        self.count += 1
         sells = obj["sell"]
 
         MIN = float("inf")
@@ -70,13 +73,28 @@ class Exchange:
             if sell[0] < MIN:
                 MIN = sell[0]
 
-        self.write({"type": "add", "order_id": self.count, "symbol": obj["symbol"], "dir": "SELL", "price": MIN + 1, "size": 1})
+        if MAX - 1 <= MIN + 1:
+            return
 
-        self.count += 1
+        self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "SELL", "price": MAX - 1, "size": 1})
+        self.orders.append(self.ID)
+
+        if len(self.orders) > 100:
+            self.write({"type": "cancel", "order_id": self.orders.pop(0)})
+
+        self.ID += 1
         
+        self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "BUY", "price": MIN + 1, "size": 1})
+        self.orders.append(self.ID)
+
+        if len(self.orders) > 100:
+            self.write({"type": "cancel", "order_id": self.orders.pop(0)})
+
+        self.ID += 1
+
 def main():
-    e = Exchange("localhost")
-    # e = Exchange("test-exch-BIGBOARDTRIO")
+    # e = Exchange("localhost")
+    e = Exchange("production")
     e.run()
 
 
