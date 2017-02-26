@@ -165,9 +165,6 @@ class Exchange:
                     self.valbz_rolling.append(dat["price"])
 
 
-def vale_valbz(exchange):
-    pass
-
 
 def order_pruning(exchange):
     d = {}
@@ -204,8 +201,8 @@ def vale_valbz(exchange):
     state_vale = exchange.positions.get("VALE")
     state_valbz = exchange.positions.get("VALBZ")
 
-    if state_vale is not None:
-        if state_vale > 0:
+    if state_vale is None or state_valbz is None:
+        return
 
     if vale_sell[1] + 10 < valbz_buy[3]:
         if state_vale < 10:
