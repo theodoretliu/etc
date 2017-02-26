@@ -256,8 +256,16 @@ def threading_wrapper(func, exchange, interval):
 
 
 def main():
-    # e = Exchange("localhost")
-    e = Exchange("test-exch-BIGBOARDTRIO")
+    if len(sys.argv) != 2:
+        print("Please specify prod or test")
+        exit(1)
+
+    if sys.argv[1].lower() in ("prod", "production"):
+        e = Exchange("production")
+        print("--- PRODUCTION PRODUCTION PRODUCTION ---")
+    else:
+        e = Exchange("test-exch-BIGBOARDTRIO")
+        print("--- TEST ---")
 
     threading_wrapper(bond_trade, e, 0.03).start()
     threading_wrapper(order_pruning, e, 5).start()
