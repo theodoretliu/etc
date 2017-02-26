@@ -160,6 +160,9 @@ def trade(exchange):
         h_mean, h_low, h_low_num, h_high, h_high_num = high
         l_mean, l_low, l_low_num, l_high, l_high_num = low
 
+        if h_mean is None or l_mean is None:
+            continue
+
         if h_high > MAX:
             MAX = h_high
             sell_symb = symb
@@ -167,16 +170,15 @@ def trade(exchange):
         if l_low < MIN:
             MIN = l_low
             buy_symb = symb
-        if h_mean is None or l_mean is None or h_high - 1 <= l_low + 1:
-            continue
 
         print("Yo")
 
-    if MAX - 1 <= MIN + 1:
-        continue
+    if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
+        return
+
 
     exchange.sell(sell_symb, MAX - 1, 1)
-    exchange.buy(bull_symb, MIN + 1, 1)
+    exchange.buy(buy_symb, MIN + 1, 1)
 
 
 def main():
