@@ -2,24 +2,57 @@
 import sys
 import socket
 import json
+import time
 
-def connect():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(("test-exch-teamname", 25000))
-    return s.makefile('rw', 1)
 
-def write(exchange, obj):
-    json.dump(obj, exchange)
-    exchange.write("\n")
+class Exchange:
+    hostname = ""
+    handlers = []
+    sock = None
 
-def read(exchange):
-    return json.loads(exchange.readline())
+    def __init__(self, hostname):
+        self.hostname = hostname
+
+    def connect(self):
+        while True:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect((self.hostname, 25000))
+                break
+            except:
+                time.sleep(1)
+
+        self.sock = s.makefile('rw', 1)
+        self.write({"type": "hello", "team": "BIGBOARDTRIO"})
+
+    def read(self):
+        r = self.sock.readline()
+        if not r:
+            return None
+        else:
+            return json.loads(r)
+
+    def write(self, obj):
+        try:
+            json.dump(obj, self.sock)
+            self.sock.write("\n")
+            return True
+        except:
+            return None
+
+    def run(self):
+        self.connect()
+        while True:
+            dat = self.read()
+            if dat is None:
+                self.connect()
+
 
 def main():
-    exchange = connect()
-    write(exchange, {"type": "hello", "team": "TEAMNAME"})
-    hello_from_exchange = read(exchange)
-    print("The exchange replied:", hello_from_exchange, file=sys.stderr)
+    e = Exchange("localhost")
+    # e = Exchange("test-exch-BIGBOARDTRIO")
+    e.run()
+
 
 if __name__ == "__main__":
     main()
