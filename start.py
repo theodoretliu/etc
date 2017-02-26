@@ -134,6 +134,33 @@ class Exchange:
             trade(self)
 
 
+def bond_trade(exchange):
+    mode = "BUY"
+    ordered = False
+    last = None
+    while True:
+        if mode == "BUY":
+            pos = exchange.positions["BOND"]
+            if pos != last:
+                if not ordered:
+                    exchange.buy("BOND", 999, 10)
+                    ordered = True
+                else:
+                    ordered = False
+                    mode = "SELL"
+            last = pos
+        else:
+            pos = exchange.positions["BOND"]
+            if pos != last:
+                if not ordered:
+                    exchange.sell("BOND", 999, 10)
+                    ordered = True
+                else:
+                    ordered = False
+                    mode = "SELL"
+            last = pos
+
+
 def trade(exchange):
     for symb in exchange.buys:
         if symb == "XLF":
