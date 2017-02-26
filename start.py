@@ -131,8 +131,6 @@ class Exchange:
             elif msg_type == "trade":
                 pass
 
-            trade(self)
-
 
 def trade(exchange):
     MIN = float('inf')
@@ -171,7 +169,6 @@ def trade(exchange):
 
     if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
         return
-
 
     exchange.sell(sell_symb, MAX - 1, 1)
     exchange.buy(buy_symb, MIN + 1, 1)
