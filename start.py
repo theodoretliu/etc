@@ -145,7 +145,7 @@ def bond_trade(exchange):
                     ordered = True
                 else:
                     ordered = False
-                    mode = "SELL"
+                    mode = "SELL" 
             last = pos
         else:
             pos = exchange.positions["BOND"]
