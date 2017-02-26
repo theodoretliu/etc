@@ -140,6 +140,19 @@ class Exchange:
                 pass
 
 
+def order_pruning(exchange):
+    d = {}
+    for o_id, (_, sym, _, _) in exchange.orders_dict.items():
+        if sym not in d:
+            d[sym] = []
+        d[sym].append(o_id)
+
+    for sym, l in d.items():
+        if len(l) > 90:
+            for o_id in l[:80]:
+                exchange.cancel(o_id)
+
+
 def bond_trade(exchange):
     state = exchange.positions.get("BOND")
 
@@ -252,6 +265,7 @@ def main():
 
     threading_wrapper(bond_trade, e, 0.0001).start()
     threading_wrapper(trade, e, 0.08).start()
+    threading_wrapper(order_pruning, e, 0.1).start()
     e.run()
 
 
