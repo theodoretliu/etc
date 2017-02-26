@@ -260,7 +260,6 @@ def main():
     e = Exchange("test-exch-BIGBOARDTRIO")
 
     threading_wrapper(bond_trade, e, 0.03).start()
-    # threading_wrapper(trade, e, 0.08).start()
     threading_wrapper(order_pruning, e, 5).start()
     e.run()
 
