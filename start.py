@@ -1,9 +1,9 @@
 #!/usr/bin/python3
+from threading import Thread
 import sys
 import socket
 import json
 import time
-import datetime
 
 ID_MAX = 2 ** 32 - 1
 
@@ -17,11 +17,19 @@ class Exchange:
     def __init__(self, hostname):
         self.hostname = hostname
         self.sock = None
+
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
+
+        # the state of the book
         self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
+
+        self.our_sell_avg = {}  # SYM -> (sum, denom)
+        self.our_buy_avg = {}  # SYM -> (sum, denom)
+
+        # our current positions
         self.positions = {}  # SYM -> integer
-        self.cash = 0
+
         self.ID = 0
         self.orders = []
 
@@ -228,18 +236,22 @@ def trade(exchange):
     #         if temp is not None:
     #             exchange.buy(sym, temp[0], 50)
                 
+
+
+def threading_wrapper(func, exchange, interval):
+    def runner():
+        while True:
+            func(exchange)
+            time.sleep(interval)
+    return Thread(target=runner)
+
+
 def main():
     # e = Exchange("localhost")
-    from threading import Thread, Timer
     e = Exchange("test-exch-BIGBOARDTRIO")
 
-    def strategies_runner():
-        while True:
-            # trade(e)
-            bond_trade(e)
-            time.sleep(0.05)
-    Thread(target=strategies_runner).start()
-
+    threading_wrapper(bond_trade, e, 0.0001).start()
+    threading_wrapper(trade, e, 0.08).start()
     e.run()
 
 
