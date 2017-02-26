@@ -6,12 +6,11 @@ import time
 
 
 class Exchange:
-    hostname = ""
-    handlers = []
-    sock = None
-
     def __init__(self, hostname):
         self.hostname = hostname
+        self.handler = []
+        self.sock = None
+        self.ID = 0
 
     def connect(self):
         while True:
@@ -47,7 +46,34 @@ class Exchange:
             if dat is None:
                 self.connect()
 
+    def trade(self, obj):
+        if obj["type"] != "book":
+            return
 
+        if obj["symbol"] == "XLF":
+            return
+
+        buys = obj["buy"]
+
+        MAX = -float("inf")
+        for buy in buys:
+            if buy[0] > MAX:
+                MAX = buy[0]
+
+        self.write({"type": "add", "order_id": self.count, "symbol": obj["symbol"], "dir": "BUY", "price": MAX - 1, "size": 1})
+
+        self.count += 1
+        sells = obj["sell"]
+
+        MIN = float("inf")
+        for sell in sells:
+            if sell[0] < MIN:
+                MIN = sell[0]
+
+        self.write({"type": "add", "order_id": self.count, "symbol": obj["symbol"], "dir": "SELL", "price": MIN + 1, "size": 1})
+
+        self.count += 1
+        
 def main():
     e = Exchange("localhost")
     # e = Exchange("test-exch-BIGBOARDTRIO")
