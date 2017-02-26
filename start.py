@@ -211,17 +211,17 @@ def vale_valbz(exchange):
         if state_vale < 10:
             exchange.buy("VALE", vale_sell[1], 10)
         if state_vale > 0:
-            exchange.convert("VALE", "SELL", 10)
+            exchange.convert("VALE", "SELL", 1)
         if state_valbz > 0:
-            exchange.sell("VALBZ", valbz_buy[3], 10)
+            exchange.sell("VALBZ", valbz_buy[3], 1)
 
     elif valbz_sell[1] is not None and vale_buy[3] is not None and valbz_sell[1] + 10 < vale_buy[3]:
         if state_valbz < 10:
             exchange.buy("VALBZ", vale_sell[1], 10)
         if state_valbz > 0:
-            exchange.convert("VALBZ", "SELL", 10)
+            exchange.convert("VALBZ", "SELL", 1)
         if state_vale > 0:
-            exchange.sell("VALE", vale_buy[3], 10)
+            exchange.sell("VALE", vale_buy[3], 1)
 
 def bond_trade(exchange):
     state = exchange.positions.get("BOND")
