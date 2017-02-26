@@ -207,9 +207,11 @@ def fair_vale(e):
 
     owned_shares = e.positions.get("VALE", 0)
     if owned_shares > 9:
-        e.sell("VALE", fair, 9)
+        id_ = e.sell("VALE", fair, 9)
+        e.vale_ordered_sells[id_] = fair
     elif owned_shares < -9:
-        e.buy("VALE", fair, 9)
+        id_ = e.buy("VALE", fair, 9)
+        e.vale_ordered_buys[id_] = fair
 
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
