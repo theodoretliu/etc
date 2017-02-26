@@ -3,13 +3,19 @@ import sys
 import socket
 import json
 import time
+import datetime
 
+ID_MAX = 2 ** 32 - 1
 
 class Exchange:
     def __init__(self, hostname):
         self.hostname = hostname
-        self.handler = []
         self.sock = None
+        self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
+        self.sells = {}  # SYM -> (mean, low, num, high num)
+        self.buys = {}  # SYM -> (mean, low, num, high, num)
+        self.positions = {}  # SYM -> integer
+        self.cash = 0
         self.ID = 0
         self.orders = []
 
@@ -40,6 +46,24 @@ class Exchange:
         except:
             return None
 
+    def buy(self, sym, price, size):
+        self.add("buy", sym, price, size)
+
+    def sell(self, sym, price, size):
+        self.add("sell", sym, price, size)
+
+    def add(self, dir, sym, price, size):
+        id_ = self.ID
+        self.write({
+            "order_id": id_,
+            "symbol": sym,
+            "dir": dir,
+            "price": price,
+            "size": size
+        })
+        self.ID = (id_ + 1) % ID_MAX
+        pass
+
     def run(self):
         self.connect()
         while True:
@@ -50,6 +74,20 @@ class Exchange:
                 self.trade(dat)
 
             time.sleep(0.001)
+            continue
+
+            msg_type = dat["type"]
+            if msg_type == "hello":
+                for sym_o in dat["symbols"]:
+                    self.positions[sym_o.symbol] = sym_o.position
+            elif msg_type == "book":
+                sym = dat["symbol"]
+                for kind in ("buy", "sell"):
+                    min_o = min(dat[kind], lambda d: d.price)
+                    max_o = max(dat[kind], lambda d: d.price)
+                    mean_o = sum(map(lambda d: d.price, dat[kind])) // len(dat[kind])
+                    getattr(self, kind + "s")()[sym] = (mean_o,) + min_o + max_o
+
 
     def trade(self, obj):
         if obj["type"] != "book":
