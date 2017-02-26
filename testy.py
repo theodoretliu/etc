@@ -15,14 +15,14 @@ def now():
 
 
 class Exchange:
-    def __init__(self):
-        self.reset(None)
+    def __init__(self, hostname):
+        self.hostname = hostname
+        self.sock = None
 
-    def reset(self, sock):
-        print("*** RESET ***")
-        self.sock = sock
-        self.fail = False
+        self.reset()
 
+    def reset(self):
+        print("---- RESET ----")
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
@@ -44,26 +44,33 @@ class Exchange:
         # valbz and vale state
         self.valbz_rolling = deque(maxlen=100)
 
+    def connect(self):
+        while True:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect((self.hostname, 25000))
+                break
+            except:
+                time.sleep(1)
+
+        self.sock = s.makefile('rw', 1)
         self.write({"type": "hello", "team": "BIGBOARDTRIO"})
 
     def read(self):
-        if self.sock is not None:
-            r = self.sock.readline()
-            if not r:
-                self.fail = True
-                return None
-            else:
-                return json.loads(r)
+        r = self.sock.readline()
+        if not r:
+            return None
+        else:
+            return json.loads(r)
 
     def write(self, obj):
-        if self.sock is not None:
-            try:
-                json.dump(obj, self.sock)
-                self.sock.write("\n")
-            except:
-                print("!!! WRITE FAILED !!!", file=sys.stderr)
-                self.fail = True
-
+        try:
+            json.dump(obj, self.sock)
+            self.sock.write("\n")
+            return True
+        except:
+            print("!!! WRITE FAILED !!!", file=sys.stderr)
+            return None
     def convert(self, sym, direction, size):
         self.ID += 1
         self.write({
@@ -102,13 +109,16 @@ class Exchange:
         })
 
     def run(self):
+        self.connect()
         while True:
             dat = self.read()
-            if self.fail:
-                return
+            if dat is None:
+                self.connect()
+                continue
 
             msg_type = dat["type"]
             if msg_type == "hello":
+                self.reset()
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
@@ -128,7 +138,7 @@ class Exchange:
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
                 if dat["error"] == "TRADING_CLOSED":
-                    return
+                    self.reset()
             elif msg_type == "error":
                 print("ERROR: ", dat["error"], file=sys.stderr)
             elif msg_type == "out":
@@ -189,20 +199,6 @@ def vale_valbz(exchange):
     if valbz_buy == None or valbz_sell == None or vale_buy == None or vale_sell == None:
         return
     
-    edge = 3
-    fair = valbz_buy[0]
-    if any(i == None for i in vale_buy + vale_sell + valbz_buy + valbz_sell):
-        return
-    MIN = fair - edge
-    if vale_sell[1] <= MIN:
-        exchange.buy("VALE", MIN, 10)
-        print("min: ", MIN)
-
-    MAX = fair + edge
-    if vale_buy[1] >= MAX:
-        exchange.sell("VALE", MAX, 10)
-        print("max: ", MAX)
-        
     # mean, low, num, high, num (self, order_id, sym, direction, size)
 
     state_vale = exchange.positions.get("VALE")
@@ -211,27 +207,31 @@ def vale_valbz(exchange):
     if state_vale is None or state_valbz is None:
         return
 
-    if vale_sell[1] is not None and valbz_buy[3] is not None and vale_sell[1] + 10 < valbz_buy[3] - 1:
+    if vale_sell[1] is not None and valbz_buy[3] is not None and vale_sell[1] + 10 < valbz_buy[3]:
         if state_vale < 10:
-            exchange.buy("VALE", vale_sell[1] + 1, 10)
-        if state_vale == 10:
+            exchange.buy("VALE", vale_sell[1], 10)
+        if state_vale > 0:
             exchange.convert("VALE", "SELL", 10)
-        order_count = abs(sum([x[3] for x in exchange.orders if x[1] == "VALBZ"]))
-        print("VALBZ ORDER COUNT:", order_count)
-        if state_valbz > 0 and order_count <= 10:
-            exchange.sell("VALBZ", valbz_buy[3] - 1, 1)
+        if state_valbz > 0:
+            exchange.sell("VALBZ", valbz_buy[3], 10)
 
-    elif valbz_sell[1] is not None and vale_buy[3] is not None and valbz_sell[1] + 10 < vale_buy[3] - 1:
+    elif valbz_sell[1] is not None and vale_buy[3] is not None and valbz_sell[1] + 10 < vale_buy[3]:
         if state_valbz < 10:
-            exchange.buy("VALBZ", vale_sell[1] + 1, 10)
-        if state_valbz == 10:
+            exchange.buy("VALBZ", vale_sell[1], 10)
+        if state_valbz > 0:
             exchange.convert("VALBZ", "SELL", 10)
-        order_count = abs(sum([x[3] for x in exchange.orders if x[1] == "VALBZ"]))
-        print("VALE ORDER COUNT:", order_count)
-        if state_vale > 0 and order_count <= 10:
-            exchange.sell("VALE", vale_buy[3] - 1, 1)
+        if state_vale > 0:
+            exchange.sell("VALE", vale_buy[3], 10)
 
 def bond_trade(exchange):
+    state = exchange.positions.get("BOND")
+    if state is None:
+        return
+
+    if state == 0:
+        exchange.buy("BOND", 999, 1)
+    elif state > 0:
+        exchange.sell("BOND", 1001, 1)
     pos = exchange.positions.get("BOND")
     if pos is None:
         return
@@ -251,26 +251,16 @@ def bond_trade(exchange):
             exchange.sell("BOND", 1001, 1)
 
 
-def cancel_all(exchange, sym_cancel):
-    cancel_ids = []
-    for o_id, (_, sym, _, _) in exchange.orders_dict.items():
-        if sym == sym_cancel:
-            cancel_ids.append(o_id)
-
-    for i in cancel_ids:
-        exchange.cancel(i)
-
-
 def trade(exchange):
-    # MIN = float('inf')
-    # MAX = -float('inf')
-    # buy_symb = ""
-    # sell_symb = ""
+    MIN = float('inf')
+    MAX = -float('inf')
+    buy_symb = ""
+    sell_symb = ""
 
     for symb in exchange.buys:
-        if symb != "VALE":
+        if symb == "XLF" or symb == "BOND":
             continue
-        cancel_all(exchange, symb)
+
         high = exchange.buys.get(symb)
         low = exchange.sells.get(symb)
 
@@ -286,29 +276,21 @@ def trade(exchange):
         if h_mean is None or l_mean is None:
             continue
 
-        if l_low - h_high < 3:
-            # cancel_all(exchange, symb)
-            continue
+        if h_high > MAX:
+            MAX = h_high
+            sell_symb = symb
 
-        exchange.buy(symb, h_high + 1, 1)
-        exchange.sell(symb, l_low - 1, 1)
+        if l_low < MIN:
+            MIN = l_low
+            buy_symb = symb
 
-    if len(exchange.orders_dict) > 100:
-        exchange.cancel(min(exchange.order_dict))
-        #     MAX = h_high
-        #     sell_symb = symb
+        print("Yo")
 
-        # if l_low < MIN:
-        #     MIN = l_low
-        #     buy_symb = symb
+    if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
+        return
 
-        # print("Yo")
-
-    # if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
-    #     return
-
-    # exchange.sell(sell_symb, MAX - 1, 1)
-    # exchange.buy(buy_symb, MIN + 1, 1)
+    exchange.sell(sell_symb, MAX - 1, 1)
+    exchange.buy(buy_symb, MIN + 1, 1)
 
     # for sym in exchange.positions:
     #     quantity = exchange.positions.get(sym)
@@ -344,40 +326,17 @@ def main():
         exit(1)
 
     if sys.argv[1].lower() in ("prod", "production"):
-        hostname = "production"
+        e = Exchange("production")
         print("--- PRODUCTION PRODUCTION PRODUCTION ---")
     else:
-        hostname = "test-exch-BIGBOARDTRIO"
+        e = Exchange("test-exch-BIGBOARDTRIO")
         print("--- TEST ---")
 
-    e = Exchange()
     threading_wrapper(bond_trade, e, 0.03).start()
     threading_wrapper(vale_valbz, e, 0.03).start()
     threading_wrapper(order_pruning, e, 5).start()
+    e.run()
 
-    s = None
-
-    while True:
-        if s is not None:
-            try:
-                s.close()
-            except:
-                print("FAILED TO CLOSE SOCKET", file=sys.stderr)
-
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((hostname, 25000))
-            sock = s.makefile('rw', 1)
-        except:
-            time.sleep(1)
-            continue
-
-        e.reset(sock)
-        e.run()
-        e.reset(None)
-
-        print("WAITING FOR MARKET")
-        time.sleep(6)
 
 if __name__ == "__main__":
     main()
