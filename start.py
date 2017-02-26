@@ -89,10 +89,6 @@ class Exchange:
 
 
             msg_type = dat["type"]
-
-            if msg_type not in ("book", "trade"):
-                print(dat)
-
             if msg_type == "hello":
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
