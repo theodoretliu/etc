@@ -19,6 +19,7 @@ class Exchange:
         self.reset(None)
 
     def reset(self, sock):
+        print("*** RESET ***")
         self.sock = sock
         self.fail = False
 
