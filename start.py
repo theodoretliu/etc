@@ -22,6 +22,7 @@ class Exchange:
         self.reset()
 
     def reset(self):
+        print("---- RESET ----")
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
