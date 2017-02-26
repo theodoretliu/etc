@@ -225,6 +225,7 @@ def trade(exchange):
                 exchange.buy(sym, temp[0], 50)
                 
 def main():
+    # test
     # e = Exchange("localhost")
     from threading import Thread, Timer
     e = Exchange("test-exch-BIGBOARDTRIO")
