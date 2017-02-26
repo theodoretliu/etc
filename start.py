@@ -133,6 +133,12 @@ class Exchange:
 
 
 def bond_trade(exchange):
+    state = exchange.positions["BOND"]
+    if state == 0:
+        exchange.buy("BOND", 999, 1)
+    elif state > 0:
+        exchange.sell("BOND", 1001, 1)
+"""
     mode = "BUY"
     ordered = False
     last = None
@@ -145,7 +151,7 @@ def bond_trade(exchange):
                     ordered = True
                 else:
                     ordered = False
-                    mode = "SELL" 
+                    mode = "SELL"
             last = pos
         else:
             pos = exchange.positions["BOND"]
@@ -157,7 +163,7 @@ def bond_trade(exchange):
                     ordered = False
                     mode = "SELL"
             last = pos
-
+"""
 
 def trade(exchange):
     MIN = float('inf')
@@ -226,6 +232,7 @@ def main():
     def strategies_runner():
         while True:
             trade(e)
+            bond_trade(e)
             time.sleep(0.05)
     Thread(target=strategies_runner).start()
 
