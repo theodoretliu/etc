@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from threading import Thread
+from collections import deque
 import sys
 import socket
 import json
@@ -32,6 +33,9 @@ class Exchange:
 
         self.ID = 0
         self.orders = []
+
+        # valbz and vale state
+        self.valbz_rolling = deque(maxlen=100)
 
     def connect(self):
         while True:
@@ -137,7 +141,12 @@ class Exchange:
             elif msg_type == "ack":
                 print("ACK", dat["order_id"])
             elif msg_type == "trade":
-                pass
+                if dat["symbol"] == "VALBZ":
+                    self.valbz_rolling.append(dat["price"])
+
+
+def vale_valbz(exchange):
+    pass
 
 
 def order_pruning(exchange):
@@ -154,41 +163,24 @@ def order_pruning(exchange):
 
 
 def bond_trade(exchange):
-    state = exchange.positions.get("BOND")
-
-    if state is None:
+    pos = exchange.positions.get("BOND")
+    if pos is None:
         return
 
-    if state == 0:
-        exchange.buy("BOND", 999, 1)
-    elif state > 0:
-        exchange.sell("BOND", 1001, 1)
-"""
-    mode = "BUY"
-    ordered = False
-    last = None
-    while True:
-        if mode == "BUY":
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.buy("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
+    cur_orders = list(filter(
+        lambda x: x[1][1] == "BOND",
+        exchange.orders_dict.items()
+    ))
+
+    if len(cur_orders) < 50:
+        if pos < -70:
+            exchange.buy("BOND", 999, 2)
+        elif pos > 70:
+            exchange.sell("BOND", 1001, 2)
         else:
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.sell("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
-"""
+            exchange.buy("BOND", 999, 1)
+            exchange.sell("BOND", 1001, 1)
+
 
 def trade(exchange):
     MIN = float('inf')
@@ -263,9 +255,9 @@ def main():
     # e = Exchange("localhost")
     e = Exchange("test-exch-BIGBOARDTRIO")
 
-    threading_wrapper(bond_trade, e, 0.0001).start()
-    threading_wrapper(trade, e, 0.08).start()
-    threading_wrapper(order_pruning, e, 0.1).start()
+    threading_wrapper(bond_trade, e, 0.03).start()
+    # threading_wrapper(trade, e, 0.08).start()
+    threading_wrapper(order_pruning, e, 5).start()
     e.run()
 
 
