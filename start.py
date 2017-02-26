@@ -405,7 +405,7 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    # threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(bond_trade, e, 0.03).start()
     # threading_wrapper(vale_valbz, e, 0.03).start()
     threading_wrapper(fair_vale, e, 0.06).start()
     threading_wrapper(order_pruning, e, 5).start()
