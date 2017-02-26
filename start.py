@@ -1,9 +1,9 @@
 #!/usr/bin/python3
+from threading import Thread
 import sys
 import socket
 import json
 import time
-import datetime
 
 ID_MAX = 2 ** 32 - 1
 
@@ -17,11 +17,19 @@ class Exchange:
     def __init__(self, hostname):
         self.hostname = hostname
         self.sock = None
+
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
+
+        # the state of the book
         self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
+
+        self.our_sell_avg = {}  # SYM -> (sum, denom)
+        self.our_buy_avg = {}  # SYM -> (sum, denom)
+
+        # our current positions
         self.positions = {}  # SYM -> integer
-        self.cash = 0
+
         self.ID = 0
         self.orders = []
 
@@ -52,6 +60,15 @@ class Exchange:
         except:
             print("!!! WRITE FAILED !!!", file=sys.stderr)
             return None
+    def convert(self, sym, direction, size):
+        self.ID += 1
+        self.write({
+            "type": "convert",
+            "order_id": self.ID,
+            "symbol": sym,
+            "dir": direction,
+            "size": size
+        })
 
     def buy(self, sym, price, size):
         self.add("BUY", sym, price, size)
@@ -78,16 +95,6 @@ class Exchange:
         self.write({
             "type": "cancel",
             "order_id": order_id
-        })
-
-    def convert(self, sym, direction, size):
-        self.ID += 1
-        self.write({
-            "type": "convert",
-            "order_id": self.ID,
-            "symbol": sym,
-            "dir": direction,
-            "size": size
         })
 
     def run(self):
@@ -142,13 +149,69 @@ class Exchange:
                 pass
 
 
+def order_pruning(exchange):
+    d = {}
+    for o_id, (_, sym, _, _) in exchange.orders_dict.items():
+        if sym not in d:
+            d[sym] = []
+        d[sym].append(o_id)
+
+    for sym, l in d.items():
+        if len(l) > 90:
+            for o_id in l[:80]:
+                exchange.cancel(o_id)
+
+def confirm(exchange, sym, direction):
+    last = -float("inf") if direction == "UP" else float("inf")
+    while True:
+        pos = exchange.positions.get(sym)
+        if pos == None:
+            break
+        if direction == "UP" and pos > last:
+            break
+        elif direction == "DOWN" and pos < last:
+            break
+        time.sleep(0.001)
+
+def vale_valbz(exchange):
+    vale_buy = exchange.buys.get("VALE")
+    valbz_buy = exchange.buys.get("VALBZ")
+    vale_sell = exchange.sells.get("VALE")
+    valbz_sell = exchange.sells.get("VALBZ")
+
+    # mean, low, num, high, num (self, order_id, sym, direction, size)
+
+    state_vale = exchange.positions.get("VALE")
+    state_valbz = exchange.positions.get("VALBZ")
+
+    if state_vale is not None:
+        if state_vale > 0:
+
+    if vale_sell[1] + 10 < valbz_buy[3]:
+        if state_vale < 10:
+            exchange.buy("VALE", vale_sell[1], 1)
+        if state_vale > 0:
+            exchange.convert("VALE", "SELL", 1)
+        if state_valbz > 0:
+            exchange.sell("VALBZ", valbz_buy[3], 1)
+
+    elif valbz_sell[1] + 10 < vale_buy[3]:
+        if state_valbz < 10:
+            exchange.buy("VALBZ", vale_sell[1], 1)
+        if state_valbz > 0:
+            exchange.convert("VALBZ", "SELL", 1)
+        if state_vale > 0:
+            exchange.sell("VALE", vale_buy[3], 1)
+
 def bond_trade(exchange):
-    state = exchange.positions["BOND"]
+    state = exchange.positions.get("BOND")
+    if state is None:
+        return
+
     if state == 0:
         exchange.buy("BOND", 999, 1)
     elif state > 0:
         exchange.sell("BOND", 1001, 1)
-
 
 def trade(exchange):
     MIN = float('inf')
@@ -157,7 +220,7 @@ def trade(exchange):
     sell_symb = ""
 
     for symb in exchange.buys:
-        if symb == "XLF":
+        if symb == "XLF" or symb == "BOND":
             continue
 
         high = exchange.buys.get(symb)
@@ -191,57 +254,41 @@ def trade(exchange):
     exchange.sell(sell_symb, MAX - 1, 1)
     exchange.buy(buy_symb, MIN + 1, 1)
 
-    for sym in self.positions:
-        quantity = self.positions.get(sym)
+    # for sym in exchange.positions:
+    #     quantity = exchange.positions.get(sym)
 
-        if quantity is None:
-            continue
+    #     if quantity is None:
+    #         continue
 
-        if quantity >= 50:
-            temp = exchange.buys.get(sym)
+    #     if quantity >= 50:
+    #         temp = exchange.buys.get(sym)
 
-            if temp is not None:
-                exchange.sell(sym, temp[0], 50)
+    #         if temp is not None:
+    #             exchange.sell(sym, temp[0], 50)
 
-        if quantity <= -50:
-            temp = exchange.sells.get(sym)
+    #     if quantity <= -50:
+    #         temp = exchange.sells.get(sym)
 
-            if temp is not None:
-                exchange.buy(sym, temp[0], 50)
+    #         if temp is not None:
+    #             exchange.buy(sym, temp[0], 50)
+                
 
-def vale_valbz(exchange):
-    vale_buy = exchange.buys.get("VALE")
-    valbz_buy = exchange.buys.get("VALBZ")
-    vale_sell = exchange.sells.get("VALE")
-    valbz_sell = exchange.sells.get("VALBZ")
 
-    # mean, low, num, high, num (self, order_id, sym, direction, size)
+def threading_wrapper(func, exchange, interval):
+    def runner():
+        while True:
+            func(exchange)
+            time.sleep(interval)
+    return Thread(target=runner)
 
-    if vale_sell[1] + 10 < valebz_buy[3]:
-        exchange.buy("VALE", vale_sell[1], 1)
-        
-        exchange.convert("VALE", "BUY", 1)
-
-        exchange.sell()
-
-    elif valbz_sell[1] + 10 < vale_buy[3]:
-        exchange.buy("VALBZ", valbz_sell[1], 1)
-        
-        exchange.convert("VALBZ", "BUY", 1)
 
 def main():
-    # test
     # e = Exchange("localhost")
-    from threading import Thread, Timer
-    e = Exchange("test-exch-BIGBOARDTRIO")
+    e = Exchange("production")
 
-    def strategies_runner():
-        while True:
-            trade(e)
-            bond_trade(e)
-            time.sleep(0.05)
-    Thread(target=strategies_runner).start()
-
+    threading_wrapper(bond_trade, e, 0.03).start()
+    #threading_wrapper(trade, e, 0.08).start()
+    threading_wrapper(order_pruning, e, 0.1).start()
     e.run()
 
 
