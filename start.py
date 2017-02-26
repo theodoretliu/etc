@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from threading import Thread
+from collections import deque
 import sys
 import socket
 import json
@@ -18,11 +19,18 @@ class Exchange:
         self.hostname = hostname
         self.sock = None
 
+        self.reset()
+
+    def reset(self):
+        print("---- RESET ----")
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
         self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
+
+        self.fullbook_sells = {}
+        self.fullbook_buys = {}
 
         self.our_sell_avg = {}  # SYM -> (sum, denom)
         self.our_buy_avg = {}  # SYM -> (sum, denom)
@@ -32,6 +40,9 @@ class Exchange:
 
         self.ID = 0
         self.orders = []
+
+        # valbz and vale state
+        self.valbz_rolling = deque(maxlen=100)
 
     def connect(self):
         while True:
@@ -60,6 +71,15 @@ class Exchange:
         except:
             print("!!! WRITE FAILED !!!", file=sys.stderr)
             return None
+    def convert(self, sym, direction, size):
+        self.ID += 1
+        self.write({
+            "type": "convert",
+            "order_id": self.ID,
+            "symbol": sym,
+            "dir": direction,
+            "size": size
+        })
 
     def buy(self, sym, price, size):
         self.add("BUY", sym, price, size)
@@ -98,6 +118,7 @@ class Exchange:
 
             msg_type = dat["type"]
             if msg_type == "hello":
+                self.reset()
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
@@ -112,9 +133,12 @@ class Exchange:
                         max_o = tuple(max(dat[kind], key=lambda d: d[0]))
                         mean_o = sum(map(lambda d: d[0], dat[kind])) // len(dat[kind])
                     getattr(self, kind + "s")[sym] = (mean_o,) + min_o + max_o
+                    getattr(self, "fullbook_" + kind + "s")[sym] = dat[kind]
             elif msg_type == "reject":
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
+                if dat["error"] == "TRADING_CLOSED":
+                    self.reset()
             elif msg_type == "error":
                 print("ERROR: ", dat["error"], file=sys.stderr)
             elif msg_type == "out":
@@ -137,7 +161,12 @@ class Exchange:
             elif msg_type == "ack":
                 print("ACK", dat["order_id"])
             elif msg_type == "trade":
-                pass
+                if dat["symbol"] == "VALBZ":
+                    self.valbz_rolling.append(dat["price"])
+
+
+def vale_valbz(exchange):
+    pass
 
 
 def order_pruning(exchange):
@@ -152,10 +181,50 @@ def order_pruning(exchange):
             for o_id in l[:80]:
                 exchange.cancel(o_id)
 
+def confirm(exchange, sym, direction):
+    last = -float("inf") if direction == "UP" else float("inf")
+    while True:
+        pos = exchange.positions.get(sym)
+        if pos == None:
+            break
+        if direction == "UP" and pos > last:
+            break
+        elif direction == "DOWN" and pos < last:
+            break
+        time.sleep(0.001)
+
+def vale_valbz(exchange):
+    vale_buy = exchange.buys.get("VALE")
+    valbz_buy = exchange.buys.get("VALBZ")
+    vale_sell = exchange.sells.get("VALE")
+    valbz_sell = exchange.sells.get("VALBZ")
+
+    # mean, low, num, high, num (self, order_id, sym, direction, size)
+
+    state_vale = exchange.positions.get("VALE")
+    state_valbz = exchange.positions.get("VALBZ")
+
+    if state_vale is not None:
+        if state_vale > 0:
+
+    if vale_sell[1] + 10 < valbz_buy[3]:
+        if state_vale < 10:
+            exchange.buy("VALE", vale_sell[1], 1)
+        if state_vale > 0:
+            exchange.convert("VALE", "SELL", 1)
+        if state_valbz > 0:
+            exchange.sell("VALBZ", valbz_buy[3], 1)
+
+    elif valbz_sell[1] + 10 < vale_buy[3]:
+        if state_valbz < 10:
+            exchange.buy("VALBZ", vale_sell[1], 1)
+        if state_valbz > 0:
+            exchange.convert("VALBZ", "SELL", 1)
+        if state_vale > 0:
+            exchange.sell("VALE", vale_buy[3], 1)
 
 def bond_trade(exchange):
     state = exchange.positions.get("BOND")
-
     if state is None:
         return
 
@@ -163,32 +232,24 @@ def bond_trade(exchange):
         exchange.buy("BOND", 999, 1)
     elif state > 0:
         exchange.sell("BOND", 1001, 1)
-"""
-    mode = "BUY"
-    ordered = False
-    last = None
-    while True:
-        if mode == "BUY":
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.buy("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
+    pos = exchange.positions.get("BOND")
+    if pos is None:
+        return
+
+    cur_orders = list(filter(
+        lambda x: x[1][1] == "BOND",
+        exchange.orders_dict.items()
+    ))
+
+    if len(cur_orders) < 50:
+        if pos < -70:
+            exchange.buy("BOND", 999, 2)
+        elif pos > 70:
+            exchange.sell("BOND", 1001, 2)
         else:
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.sell("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
-"""
+            exchange.buy("BOND", 999, 1)
+            exchange.sell("BOND", 1001, 1)
+
 
 def cancel_all(exchange, sym_cancel):
     cancel_ids = []
@@ -278,14 +339,21 @@ def threading_wrapper(func, exchange, interval):
 
 
 def main():
-    # e = Exchange("localhost")
-    e = Exchange("test-exch-BIGBOARDTRIO")
+    if len(sys.argv) != 2:
+        print("Please specify prod or test")
+        exit(1)
 
-    #threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(trade, e, 0.1).start()
-    #threading_wrapper(order_pruning, e, 0.1).start()
+    if sys.argv[1].lower() in ("prod", "production"):
+        e = Exchange("production")
+        print("--- PRODUCTION PRODUCTION PRODUCTION ---")
+    else:
+        e = Exchange("test-exch-BIGBOARDTRIO")
+        print("--- TEST ---")
+
+    threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(vale_valbz, e, 0.03).start()
+    threading_wrapper(order_pruning, e, 5).start()
     e.run()
-
 
 if __name__ == "__main__":
     main()

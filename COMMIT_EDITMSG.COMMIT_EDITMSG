@@ -1,0 +1,18 @@
+ok
+
+# --------------
+# Please enter the commit message for your changes. Everything below
+# this paragraph is ignored, and an empty message aborts the commit.
+# Just close the window to accept your message.
+diff --git a/start.py b/start.py
+index 1c4dd10..4666fd8 100644
+--- a/start.py
++++ b/start.py
+@@ -225,6 +225,7 @@ def trade(exchange):
+                 exchange.buy(sym, temp[0], 50)
+                 
+ def main():
++    # test
+     # e = Exchange("localhost")
+     from threading import Thread, Timer
+     e = Exchange("test-exch-BIGBOARDTRIO")
