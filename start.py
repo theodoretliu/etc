@@ -139,6 +139,11 @@ class Exchange:
 
 
 def trade(exchange):
+    MIN = float('inf')
+    MAX = -float('inf')
+    buy_symb = ""
+    sell_symb = ""
+
     for symb in exchange.buys:
         if symb == "XLF":
             continue
@@ -155,13 +160,23 @@ def trade(exchange):
         h_mean, h_low, h_low_num, h_high, h_high_num = high
         l_mean, l_low, l_low_num, l_high, l_high_num = low
 
+        if h_high > MAX:
+            MAX = h_high
+            sell_symb = symb
+
+        if l_low < MIN:
+            MIN = l_low
+            buy_symb = symb
         if h_mean is None or l_mean is None or h_high - 1 <= l_low + 1:
             continue
 
         print("Yo")
 
-        exchange.sell(symb, h_high - 1, 1)
-        exchange.buy(symb, l_low + 1, 1)
+    if MAX - 1 <= MIN + 1:
+        continue
+
+    exchange.sell(sell_symb, MAX - 1, 1)
+    exchange.buy(bull_symb, MIN + 1, 1)
 
 
 def main():
