@@ -205,6 +205,12 @@ def fair_vale(e):
         if diff < -16 or diff > 1:
             e.cancel(id_)
 
+    owned_shares = e.positions.get("VALE", 0)
+    if owned_shares > 9:
+        e.sell("VALE", fair, 9)
+    elif owned_shares < -9:
+        e.buy("VALE", fair, 9)
+
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
 
