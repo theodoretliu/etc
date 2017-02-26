@@ -335,6 +335,7 @@ def main():
 
         e.reset(sock)
         e.run()
+        e.reset(None)
 
         time.sleep(1)
 
