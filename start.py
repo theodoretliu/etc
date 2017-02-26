@@ -148,32 +148,7 @@ def bond_trade(exchange):
         exchange.buy("BOND", 999, 1)
     elif state > 0:
         exchange.sell("BOND", 1001, 1)
-"""
-    mode = "BUY"
-    ordered = False
-    last = None
-    while True:
-        if mode == "BUY":
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.buy("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
-        else:
-            pos = exchange.positions["BOND"]
-            if pos != last:
-                if not ordered:
-                    exchange.sell("BOND", 999, 10)
-                    ordered = True
-                else:
-                    ordered = False
-                    mode = "SELL"
-            last = pos
-"""
+
 
 def trade(exchange):
     MIN = float('inf')
