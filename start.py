@@ -43,6 +43,8 @@ class Exchange:
 
         # valbz and vale state
         self.valbz_rolling = deque(maxlen=100)
+        self.vale_ordered_buys = {}  # order_id -> fair_val
+        self.vale_ordered_sells = {}  # order_id -> fair_val
 
         self.write({"type": "hello", "team": "BIGBOARDTRIO"})
 
@@ -75,10 +77,10 @@ class Exchange:
         })
 
     def buy(self, sym, price, size):
-        self.add("BUY", sym, price, size)
+        return self.add("BUY", sym, price, size)
 
     def sell(self, sym, price, size):
-        self.add("SELL", sym, price, size)
+        return self.add("SELL", sym, price, size)
 
     def add(self, dir, sym, price, size):
         id_ = self.ID
@@ -93,6 +95,7 @@ class Exchange:
         })
         print("ADD", id_)
         self.ID = (id_ + 1) % ID_MAX
+        return id_
 
     def cancel(self, order_id):
         self.orders_dict.pop(order_id, None)
@@ -179,6 +182,50 @@ def confirm(exchange, sym, direction):
         elif direction == "DOWN" and pos < last:
             break
         time.sleep(0.001)
+
+
+def fair_vale(e):
+    if len(e.valbz_rolling) == 0:
+        return
+
+    fair = sum(e.valbz_rolling) / len(e.valbz_rolling)
+
+    to_remove = (e.vale_ordered_buys.keys() | e.vale_ordered_sells.keys()) - e.orders_dict.keys()
+    for r in to_remove:
+        e.vale_ordered_buys.pop(r, None)
+        e.vale_ordered_sells.pop(r, None)
+
+    for id_, old_fair in e.vale_ordered_buys.items():
+        diff = fair - old_fair
+        if diff > 16 or diff < -1:
+            e.cancel(id_)
+
+    for id_, old_fair in e.vale_ordered_sells.items():
+        diff = fair - old_fair
+        if diff < -16 or diff > 1:
+            e.cancel(id_)
+
+    owned_shares = e.positions.get("VALE", 0)
+    if owned_shares > 9:
+        e.sell("VALE", fair, 9)
+    elif owned_shares < -9:
+        e.buy("VALE", fair, 9)
+
+    buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
+    sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
+
+    for o in buy_offers:
+        if o[0] < (fair - 1):
+            id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
+            e.vale_ordered_buys[id_] = fair
+            break
+
+    for o in sell_offers:
+        if o[0] > (fair + 1):
+            id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
+            e.vale_ordered_sells[id_] = fair
+            break
+
 
 def vale_valbz(exchange):
     vale_buy = exchange.buys.get("VALE")
@@ -356,8 +403,9 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(vale_valbz, e, 0.03).start()
+    # threading_wrapper(bond_trade, e, 0.03).start()
+    # threading_wrapper(vale_valbz, e, 0.03).start()
+    threading_wrapper(fair_vale, e, 0.06).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
@@ -382,6 +430,7 @@ def main():
         e.reset(None)
 
         print("WAITING FOR MARKET")
+        sys.stdout.flush()
         time.sleep(6)
 
 if __name__ == "__main__":
