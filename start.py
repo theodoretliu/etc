@@ -133,7 +133,11 @@ class Exchange:
 
 
 def bond_trade(exchange):
-    state = exchange.positions["BOND"]
+    state = exchange.positions.get("BOND")
+
+    if state is None:
+        return
+
     if state == 0:
         exchange.buy("BOND", 999, 1)
     elif state > 0:
@@ -172,7 +176,7 @@ def trade(exchange):
     sell_symb = ""
 
     for symb in exchange.buys:
-        if symb == "XLF":
+        if symb == "XLF" or symb == "BOND":
             continue
 
         high = exchange.buys.get(symb)
@@ -231,7 +235,7 @@ def main():
 
     def strategies_runner():
         while True:
-            trade(e)
+            # trade(e)
             bond_trade(e)
             time.sleep(0.05)
     Thread(target=strategies_runner).start()
