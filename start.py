@@ -19,6 +19,9 @@ class Exchange:
         self.hostname = hostname
         self.sock = None
 
+        self.reset()
+
+    def reset(self):
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
@@ -102,6 +105,7 @@ class Exchange:
 
             msg_type = dat["type"]
             if msg_type == "hello":
+                self.reset()
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
