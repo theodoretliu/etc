@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from threading import Thread
+from collections import deque
 import sys
 import socket
 import json
@@ -18,11 +19,18 @@ class Exchange:
         self.hostname = hostname
         self.sock = None
 
+        self.reset()
+
+    def reset(self):
+        print("---- RESET ----")
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
         self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
+
+        self.fullbook_sells = {}
+        self.fullbook_buys = {}
 
         self.our_sell_avg = {}  # SYM -> (sum, denom)
         self.our_buy_avg = {}  # SYM -> (sum, denom)
@@ -32,6 +40,9 @@ class Exchange:
 
         self.ID = 0
         self.orders = []
+
+        # valbz and vale state
+        self.valbz_rolling = deque(maxlen=100)
 
     def connect(self):
         while True:
@@ -107,6 +118,7 @@ class Exchange:
 
             msg_type = dat["type"]
             if msg_type == "hello":
+                self.reset()
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
@@ -121,9 +133,12 @@ class Exchange:
                         max_o = tuple(max(dat[kind], key=lambda d: d[0]))
                         mean_o = sum(map(lambda d: d[0], dat[kind])) // len(dat[kind])
                     getattr(self, kind + "s")[sym] = (mean_o,) + min_o + max_o
+                    getattr(self, "fullbook_" + kind + "s")[sym] = dat[kind]
             elif msg_type == "reject":
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
+                if dat["error"] == "TRADING_CLOSED":
+                    self.reset()
             elif msg_type == "error":
                 print("ERROR: ", dat["error"], file=sys.stderr)
             elif msg_type == "out":
@@ -146,7 +161,12 @@ class Exchange:
             elif msg_type == "ack":
                 print("ACK", dat["order_id"])
             elif msg_type == "trade":
-                pass
+                if dat["symbol"] == "VALBZ":
+                    self.valbz_rolling.append(dat["price"])
+
+
+def vale_valbz(exchange):
+    pass
 
 
 def order_pruning(exchange):
@@ -212,6 +232,24 @@ def bond_trade(exchange):
         exchange.buy("BOND", 999, 1)
     elif state > 0:
         exchange.sell("BOND", 1001, 1)
+    pos = exchange.positions.get("BOND")
+    if pos is None:
+        return
+
+    cur_orders = list(filter(
+        lambda x: x[1][1] == "BOND",
+        exchange.orders_dict.items()
+    ))
+
+    if len(cur_orders) < 50:
+        if pos < -70:
+            exchange.buy("BOND", 999, 2)
+        elif pos > 70:
+            exchange.sell("BOND", 1001, 2)
+        else:
+            exchange.buy("BOND", 999, 1)
+            exchange.sell("BOND", 1001, 1)
+
 
 def trade(exchange):
     MIN = float('inf')
@@ -283,12 +321,19 @@ def threading_wrapper(func, exchange, interval):
 
 
 def main():
-    # e = Exchange("localhost")
-    e = Exchange("production")
+    if len(sys.argv) != 2:
+        print("Please specify prod or test")
+        exit(1)
+
+    if sys.argv[1].lower() in ("prod", "production"):
+        e = Exchange("production")
+        print("--- PRODUCTION PRODUCTION PRODUCTION ---")
+    else:
+        e = Exchange("test-exch-BIGBOARDTRIO")
+        print("--- TEST ---")
 
     threading_wrapper(bond_trade, e, 0.03).start()
-    #threading_wrapper(trade, e, 0.08).start()
-    threading_wrapper(order_pruning, e, 0.1).start()
+    threading_wrapper(order_pruning, e, 5).start()
     e.run()
 
 
