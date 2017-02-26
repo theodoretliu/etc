@@ -129,7 +129,7 @@ class Exchange:
                 else:
                     print("WTF: not BUY or SELL", file=sys.stderr)
                 self.positions[sym] = cur
-                self.positions[sym] = cash
+                self.positions["USD"] = cash
             elif msg_type == "ack":
                 print("ACK", dat["order_id"])
             elif msg_type == "trade":
