@@ -248,10 +248,10 @@ def threading_wrapper(func, exchange, interval):
 
 def main():
     # e = Exchange("localhost")
-    e = Exchange("test-exch-BIGBOARDTRIO")
+    e = Exchange("production")
 
-    threading_wrapper(bond_trade, e, 0.0001).start()
-    threading_wrapper(trade, e, 0.08).start()
+    threading_wrapper(bond_trade, e, 0.03).start()
+    #threading_wrapper(trade, e, 0.08).start()
     e.run()
 
 
