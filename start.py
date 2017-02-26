@@ -69,6 +69,7 @@ class Exchange:
             "price": price,
             "size": size
         })
+        print("ADD", id_)
         self.ID = (id_ + 1) % ID_MAX
 
     def cancel(self, order_id):
@@ -84,20 +85,29 @@ class Exchange:
             dat = self.read()
             if dat is None:
                 self.connect()
-            else:
-                self.trade(dat)
+                continue
+
 
             msg_type = dat["type"]
+
+            if msg_type not in ("book", "trade"):
+                print(dat)
+
             if msg_type == "hello":
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
                 sym = dat["symbol"]
                 for kind in ("buy", "sell"):
-                    min_o = min(dat[kind], lambda d: d.price)
-                    max_o = max(dat[kind], lambda d: d.price)
-                    mean_o = sum(map(lambda d: d.price, dat[kind])) // len(dat[kind])
-                    getattr(self, kind + "s")()[sym] = (mean_o,) + min_o + max_o
+                    if len(dat[kind]) == 0:
+                        min_o = (None, 0)
+                        max_o = (None, 0)
+                        mean_o = None
+                    else:
+                        min_o = tuple(min(dat[kind], key=lambda d: d[0]))
+                        max_o = tuple(max(dat[kind], key=lambda d: d[0]))
+                        mean_o = sum(map(lambda d: d[0], dat[kind])) // len(dat[kind])
+                    getattr(self, kind + "s")[sym] = (mean_o,) + min_o + max_o
             elif msg_type == "reject":
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
@@ -121,69 +131,38 @@ class Exchange:
                 self.positions[sym] = cur
                 self.positions[sym] = cash
             elif msg_type == "ack":
-                pass
+                print("ACK", dat["order_id"])
             elif msg_type == "trade":
                 pass
 
+            trade(self)
 
-    def trade(self, obj):
-        for symb in self.buys:
-            if symb == "XLF":
-                continue
 
-            high = self.buys.get(symb)
-            low = self.sells.get(symb)
+def trade(exchange):
+    for symb in exchange.buys:
+        if symb == "XLF":
+            continue
 
-            if high is None or low is None:
-                continue
+        high = exchange.buys.get(symb)
+        low = exchange.sells.get(symb)
 
-            high = high[3]
-            low = low[1]
+        print("H", high)
+        print("L", low)
 
-            if high - 1 <= low + 1:
-                continue
+        if high is None or low is None:
+            continue
 
-            self.sell(symb, high - 1, 1)
-            self.buy(symb, low + 1, 1)
+        h_mean, h_low, h_low_num, h_high, h_high_num = high
+        l_mean, l_low, l_low_num, l_high, l_high_num = low
 
-        # if obj["type"] != "book":
-        #     return
+        if h_mean is None or l_mean is None or h_high - 1 <= l_low + 1:
+            continue
 
-        # if obj["symbol"] == "XLF":
-        #     return
+        print("Yo")
 
-        # buys = obj["buy"]
+        exchange.sell(symb, h_high - 1, 1)
+        exchange.buy(symb, l_low + 1, 1)
 
-        # MAX = -float("inf")
-        # for buy in buys:
-        #     if buy[0] > MAX:
-        #         MAX = buy[0]
-
-        # sells = obj["sell"]
-
-        # MIN = float("inf")
-        # for sell in sells:
-        #     if sell[0] < MIN:
-        #         MIN = sell[0]
-
-        # if MAX - 1 <= MIN + 1:
-        #     return
-
-        # self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "SELL", "price": MAX - 1, "size": 1})
-        # self.orders.append(self.ID)
-
-        # if len(self.orders) > 100:
-        #     self.write({"type": "cancel", "order_id": self.orders.pop(0)})
-
-        # self.ID += 1
-        
-        # self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "BUY", "price": MIN + 1, "size": 1})
-        # self.orders.append(self.ID)
-
-        # if len(self.orders) > 100:
-        #     self.write({"type": "cancel", "order_id": self.orders.pop(0)})
-
-        # self.ID += 1
 
 def main():
     # e = Exchange("localhost")
