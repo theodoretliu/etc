@@ -123,6 +123,8 @@ class Exchange:
             elif msg_type == "reject":
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
+                if dat["error"] == "TRADING_CLOSED":
+                    self.reset()
             elif msg_type == "error":
                 print("ERROR: ", dat["error"], file=sys.stderr)
             elif msg_type == "out":
