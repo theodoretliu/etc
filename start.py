@@ -80,6 +80,16 @@ class Exchange:
             "order_id": order_id
         })
 
+    def convert(self, sym, direction, size):
+        self.ID += 1
+        self.write({
+            "type": "convert",
+            "order_id": self.ID,
+            "symbol": sym,
+            "dir": direction,
+            "size": size
+        })
+
     def run(self):
         self.connect()
         while True:
@@ -223,7 +233,27 @@ def trade(exchange):
 
             if temp is not None:
                 exchange.buy(sym, temp[0], 50)
-                
+
+def vale_valbz(exchange):
+    vale_buy = exchange.buys.get("VALE")
+    valbz_buy = exchange.buys.get("VALBZ")
+    vale_sell = exchange.sells.get("VALE")
+    valbz_sell = exchange.sells.get("VALBZ")
+
+    # mean, low, num, high, num (self, order_id, sym, direction, size)
+
+    if vale_sell[1] + 10 < valebz_buy[3]:
+        exchange.buy("VALE", vale_sell[1], 1)
+        
+        exchange.convert("VALE", "BUY", 1)
+
+        exchange.sell()
+
+    elif valbz_sell[1] + 10 < vale_buy[3]:
+        exchange.buy("VALBZ", valbz_sell[1], 1)
+        
+        exchange.convert("VALBZ", "BUY", 1)
+
 def main():
     # test
     # e = Exchange("localhost")
