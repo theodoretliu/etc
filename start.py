@@ -189,7 +189,7 @@ def vale_valbz(exchange):
     if valbz_buy == None or valbz_sell == None or vale_buy == None or vale_sell == None:
         return
     
-    edge = 3
+    edge = 1
     fair = valbz_buy[0]
     if any(i == None for i in vale_buy + vale_sell + valbz_buy + valbz_sell):
         return
@@ -210,6 +210,11 @@ def vale_valbz(exchange):
 
     if state_vale is None or state_valbz is None:
         return
+
+    MAX = fair + edge
+    if valbz_buy[1] >= MAX and state_valbz > 0:
+        exchange.sell("VALE", MAX, 10)
+        print("max: ", MAX)
 
     if vale_sell[1] is not None and valbz_buy[3] is not None and vale_sell[1] + 10 < valbz_buy[3] - 1:
         if state_vale < 10:
