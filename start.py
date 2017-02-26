@@ -12,7 +12,7 @@ class Exchange:
         self.hostname = hostname
         self.sock = None
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
-        self.sells = {}  # SYM -> (mean, low, num, high num)
+        self.sells = {}  # SYM -> (mean, low, num, high, num)
         self.buys = {}  # SYM -> (mean, low, num, high, num)
         self.positions = {}  # SYM -> integer
         self.cash = 0
@@ -73,9 +73,6 @@ class Exchange:
             else:
                 self.trade(dat)
 
-            time.sleep(0.001)
-            continue
-
             msg_type = dat["type"]
             if msg_type == "hello":
                 for sym_o in dat["symbols"]:
@@ -90,48 +87,67 @@ class Exchange:
 
 
     def trade(self, obj):
-        if obj["type"] != "book":
-            return
+        for symb in self.buys:
+            if symb == "XLF":
+                continue
 
-        if obj["symbol"] == "XLF":
-            return
+            high = self.buys.get(symb)
+            low = self.sells.get(symb)
 
-        buys = obj["buy"]
+            if high is None or low is None:
+                continue
 
-        MAX = -float("inf")
-        for buy in buys:
-            if buy[0] > MAX:
-                MAX = buy[0]
+            high = high[3]
+            low = low[1]
 
-        sells = obj["sell"]
+            if high - 1 <= low + 1:
+                continue
 
-        MIN = float("inf")
-        for sell in sells:
-            if sell[0] < MIN:
-                MIN = sell[0]
+            self.sell(symb, high - 1, 1)
+            self.buy(symb, low + 1, 1)
 
-        if MAX - 1 <= MIN + 1:
-            return
+        # if obj["type"] != "book":
+        #     return
 
-        self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "SELL", "price": MAX - 1, "size": 1})
-        self.orders.append(self.ID)
+        # if obj["symbol"] == "XLF":
+        #     return
 
-        if len(self.orders) > 100:
-            self.write({"type": "cancel", "order_id": self.orders.pop(0)})
+        # buys = obj["buy"]
 
-        self.ID += 1
+        # MAX = -float("inf")
+        # for buy in buys:
+        #     if buy[0] > MAX:
+        #         MAX = buy[0]
+
+        # sells = obj["sell"]
+
+        # MIN = float("inf")
+        # for sell in sells:
+        #     if sell[0] < MIN:
+        #         MIN = sell[0]
+
+        # if MAX - 1 <= MIN + 1:
+        #     return
+
+        # self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "SELL", "price": MAX - 1, "size": 1})
+        # self.orders.append(self.ID)
+
+        # if len(self.orders) > 100:
+        #     self.write({"type": "cancel", "order_id": self.orders.pop(0)})
+
+        # self.ID += 1
         
-        self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "BUY", "price": MIN + 1, "size": 1})
-        self.orders.append(self.ID)
+        # self.write({"type": "add", "order_id": self.ID, "symbol": obj["symbol"], "dir": "BUY", "price": MIN + 1, "size": 1})
+        # self.orders.append(self.ID)
 
-        if len(self.orders) > 100:
-            self.write({"type": "cancel", "order_id": self.orders.pop(0)})
+        # if len(self.orders) > 100:
+        #     self.write({"type": "cancel", "order_id": self.orders.pop(0)})
 
-        self.ID += 1
+        # self.ID += 1
 
 def main():
     # e = Exchange("localhost")
-    e = Exchange("production")
+    e = Exchange("test-exch-BIGBOARDTRIO")
     e.run()
 
 
