@@ -295,9 +295,9 @@ def bond_trade(exchange):
 
     if len(cur_orders) < 50:
         if pos < -70:
-            exchange.buy("BOND", 999, 2)
+            exchange.buy("BOND", 999, 20)
         elif pos > 70:
-            exchange.sell("BOND", 1001, 2)
+            exchange.sell("BOND", 1001, 20)
         else:
             exchange.buy("BOND", 999, 1)
             exchange.sell("BOND", 1001, 1)
@@ -403,9 +403,9 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    # threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(bond_trade, e, 0.03).start()
     # threading_wrapper(vale_valbz, e, 0.03).start()
-    threading_wrapper(fair_vale, e, 0.06).start()
+    # threading_wrapper(fair_vale, e, 0.06).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
