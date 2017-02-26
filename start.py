@@ -15,14 +15,14 @@ def now():
 
 
 class Exchange:
-    def __init__(self, hostname):
-        self.hostname = hostname
-        self.sock = None
+    def __init__(self):
+        self.reset(None)
 
-        self.reset()
+    def reset(self, sock):
+        print("*** RESET ***")
+        self.sock = sock
+        self.fail = False
 
-    def reset(self):
-        print("---- RESET ----")
         self.orders_dict = {}  # order_id -> (date, SYM, price, amt)
 
         # the state of the book
@@ -44,33 +44,26 @@ class Exchange:
         # valbz and vale state
         self.valbz_rolling = deque(maxlen=100)
 
-    def connect(self):
-        while True:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.connect((self.hostname, 25000))
-                break
-            except:
-                time.sleep(1)
-
-        self.sock = s.makefile('rw', 1)
         self.write({"type": "hello", "team": "BIGBOARDTRIO"})
 
     def read(self):
-        r = self.sock.readline()
-        if not r:
-            return None
-        else:
-            return json.loads(r)
+        if self.sock is not None:
+            r = self.sock.readline()
+            if not r:
+                self.fail = True
+                return None
+            else:
+                return json.loads(r)
 
     def write(self, obj):
-        try:
-            json.dump(obj, self.sock)
-            self.sock.write("\n")
-            return True
-        except:
-            print("!!! WRITE FAILED !!!", file=sys.stderr)
-            return None
+        if self.sock is not None:
+            try:
+                json.dump(obj, self.sock)
+                self.sock.write("\n")
+            except:
+                print("!!! WRITE FAILED !!!", file=sys.stderr)
+                self.fail = True
+
     def convert(self, sym, direction, size):
         self.ID += 1
         self.write({
@@ -109,16 +102,13 @@ class Exchange:
         })
 
     def run(self):
-        self.connect()
         while True:
             dat = self.read()
-            if dat is None:
-                self.connect()
-                continue
+            if self.fail:
+                return
 
             msg_type = dat["type"]
             if msg_type == "hello":
-                self.reset()
                 for sym_o in dat["symbols"]:
                     self.positions[sym_o["symbol"]] = sym_o["position"]
             elif msg_type == "book":
@@ -138,7 +128,7 @@ class Exchange:
                 print("REJECTED: ", dat["error"], file=sys.stderr)
                 self.orders_dict.pop(dat["order_id"], None)
                 if dat["error"] == "TRADING_CLOSED":
-                    self.reset()
+                    return
             elif msg_type == "error":
                 print("ERROR: ", dat["error"], file=sys.stderr)
             elif msg_type == "out":
@@ -221,14 +211,6 @@ def vale_valbz(exchange):
             exchange.sell("VALE", vale_buy[3], 1)
 
 def bond_trade(exchange):
-    state = exchange.positions.get("BOND")
-    if state is None:
-        return
-
-    if state == 0:
-        exchange.buy("BOND", 999, 1)
-    elif state > 0:
-        exchange.sell("BOND", 1001, 1)
     pos = exchange.positions.get("BOND")
     if pos is None:
         return
@@ -323,16 +305,38 @@ def main():
         exit(1)
 
     if sys.argv[1].lower() in ("prod", "production"):
-        e = Exchange("production")
+        hostname = "production"
         print("--- PRODUCTION PRODUCTION PRODUCTION ---")
     else:
-        e = Exchange("test-exch-BIGBOARDTRIO")
+        hostname = "test-exch-BIGBOARDTRIO"
         print("--- TEST ---")
 
+    e = Exchange()
     threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(vale_valbz, e, 0.03).start()
+    # threading_wrapper(vale_valbz, e, 0.03).start()
     threading_wrapper(order_pruning, e, 5).start()
-    e.run()
+
+    s = None
+
+    while True:
+        if s is not None:
+            try:
+                s.close()
+            except:
+                print("FAILED TO CLOSE SOCKET", file=sys.stderr)
+
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((hostname, 25000))
+            sock = s.makefile('rw', 1)
+        except:
+            time.sleep(1)
+            continue
+
+        e.reset(sock)
+        e.run()
+
+        time.sleep(1)
 
 
 if __name__ == "__main__":
