@@ -352,7 +352,7 @@ def threading_wrapper(func, exchange, interval):
     def runner():
         while True:
             func(exchange)
-            time.sleep(interval)
+            time.sleep(interval)    
     return Thread(target=runner)
 
 
