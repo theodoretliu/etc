@@ -364,9 +364,9 @@ def bond_trade(exchange):
 
     if len(cur_orders) < 50:
         if pos < -70:
-            exchange.buy("BOND", 999, 2)
+            exchange.buy("BOND", 999, 20)
         elif pos > 70:
-            exchange.sell("BOND", 1001, 2)
+            exchange.sell("BOND", 1001, 20)
         else:
             exchange.buy("BOND", 999, 1)
             exchange.sell("BOND", 1001, 1)
