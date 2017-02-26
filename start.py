@@ -50,6 +50,7 @@ class Exchange:
             self.sock.write("\n")
             return True
         except:
+            print("!!! WRITE FAILED !!!", file=sys.stderr)
             return None
 
     def buy(self, sym, price, size):
@@ -86,7 +87,6 @@ class Exchange:
             if dat is None:
                 self.connect()
                 continue
-
 
             msg_type = dat["type"]
             if msg_type == "hello":
@@ -131,7 +131,32 @@ class Exchange:
             elif msg_type == "trade":
                 pass
 
-            trade(self)
+
+def bond_trade(exchange):
+    mode = "BUY"
+    ordered = False
+    last = None
+    while True:
+        if mode == "BUY":
+            pos = exchange.positions["BOND"]
+            if pos != last:
+                if not ordered:
+                    exchange.buy("BOND", 999, 10)
+                    ordered = True
+                else:
+                    ordered = False
+                    mode = "SELL" 
+            last = pos
+        else:
+            pos = exchange.positions["BOND"]
+            if pos != last:
+                if not ordered:
+                    exchange.sell("BOND", 999, 10)
+                    ordered = True
+                else:
+                    ordered = False
+                    mode = "SELL"
+            last = pos
 
 
 def trade(exchange):
@@ -172,7 +197,6 @@ def trade(exchange):
     if MAX - 1 <= MIN + 1 or sell_symb == "" or buy_symb == "":
         return
 
-
     exchange.sell(sell_symb, MAX - 1, 1)
     exchange.buy(buy_symb, MIN + 1, 1)
 
@@ -196,7 +220,15 @@ def trade(exchange):
                 
 def main():
     # e = Exchange("localhost")
+    from threading import Thread, Timer
     e = Exchange("test-exch-BIGBOARDTRIO")
+
+    def strategies_runner():
+        while True:
+            trade(e)
+            time.sleep(0.05)
+    Thread(target=strategies_runner).start()
+
     e.run()
 
 
