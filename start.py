@@ -337,7 +337,8 @@ def main():
         e.run()
         e.reset(None)
 
-        time.sleep(1)
+        print("WAITING FOR MARKET")
+        time.sleep(3)
 
 
 if __name__ == "__main__":
