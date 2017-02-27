@@ -225,10 +225,10 @@ def xlf_stuff(e):
 
     owned_shares = e.positions.get("XLF", 0)
     if owned_shares > 50:
-        id_ = e.sell("XLF", fair, 20)
+        id_ = e.sell("XLF", round(fair + 2), 14)
         e.xlf_ordered_sells[id_] = fair
     elif owned_shares < -50:
-        id_ = e.buy("XLF", fair, 20)
+        id_ = e.buy("XLF", round(fair - 2), 14)
         e.xlf_ordered_buys[id_] = fair
 
     buy_offers = sorted(e.fullbook_buys.get("XLF"), key=lambda x: x[0], reverse=True)
@@ -236,14 +236,14 @@ def xlf_stuff(e):
 
     if owned_shares < 95:
         for o in buy_offers:
-            if o[0] < (fair - 1):
+            if o[0] < (fair - 2):
                 id_ = e.buy("XLF", o[0] + 1, min((o[1] + 1) // 2, 10))
                 e.xlf_ordered_buys[id_] = fair
                 break
 
     if owned_shares > -95:
         for o in sell_offers:
-            if o[0] > (fair + 1):
+            if o[0] > (fair + 2):
                 id_ = e.sell("XLF", o[0] - 1, min((o[1] + 1) // 2, 10))
                 e.xlf_ordered_sells[id_] = fair
                 break
@@ -272,9 +272,9 @@ def fair_vale(e):
 
     owned_shares = e.positions.get("VALE", 0)
     if owned_shares > 9:
-        e.sell("VALE", fair, 9)
+        e.sell("VALE", round(fair + 1), 4)
     elif owned_shares < -9:
-        e.buy("VALE", fair, 9)
+        e.buy("VALE", round(fair - 1), 4)
 
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
