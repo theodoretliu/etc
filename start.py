@@ -207,28 +207,24 @@ def fair_vale(e):
 
     owned_shares = e.positions.get("VALE", 0)
     if owned_shares > 9:
-        id_ = e.sell("VALE", fair, 5)
-        e.vale_ordered_sells[id_] = fair
+        e.sell("VALE", fair, 9)
     elif owned_shares < -9:
-        id_ = e.buy("VALE", fair, 5)
-        e.vale_ordered_buys[id_] = fair
+        e.buy("VALE", fair, 9)
 
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
 
-    if owned_shares < 10:
-        for o in buy_offers:
-            if o[0] < (fair - 1):
-                id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
-                e.vale_ordered_buys[id_] = fair
-                break
+    for o in buy_offers:
+        if o[0] < (fair - 1):
+            id_ = e.buy("VALE", o[0] + 1, min((o[1] + 1) // 2, 5))
+            e.vale_ordered_buys[id_] = fair
+            break
 
-    if owned_shares > -10:
-        for o in sell_offers:
-            if o[0] > (fair + 1):
-                id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
-                e.vale_ordered_sells[id_] = fair
-                break
+    for o in sell_offers:
+        if o[0] > (fair + 1):
+            id_ = e.sell("VALE", o[0] - 1, min((o[1] + 1) // 2, 5))
+            e.vale_ordered_sells[id_] = fair
+            break
 
 
 def vale_valbz(exchange):
@@ -236,25 +232,11 @@ def vale_valbz(exchange):
     valbz_buy = exchange.buys.get("VALBZ")
     vale_sell = exchange.sells.get("VALE")
     valbz_sell = exchange.sells.get("VALBZ")
-
-    if valbz_buy == None or valbz_sell == None or vale_buy == None or vale_sell == None:
-        return
     
-    edge = 1
-    fair = valbz_buy[0]
+    if any(i == None for i in (vale_sell, vale_buy, valbz_buy, valbz_sell)):
+        return
     if any(i == None for i in vale_buy + vale_sell + valbz_buy + valbz_sell):
         return
-    MIN = fair - edge
-    if vale_sell[1] <= MIN:
-        exchange.buy("VALE", MIN, 10)
-        print("min: ", MIN)
-
-    MAX = fair + edge
-    if vale_buy[1] >= MAX:
-        exchange.sell("VALE", MAX, 10)
-        print("max: ", MAX)
-        
-    # mean, low, num, high, num (self, order_id, sym, direction, size)
 
     state_vale = exchange.positions.get("VALE")
     state_valbz = exchange.positions.get("VALBZ")
@@ -262,30 +244,15 @@ def vale_valbz(exchange):
     if state_vale is None or state_valbz is None:
         return
 
-    MAX = fair + edge
-    if valbz_buy[1] >= MAX and state_valbz > 0:
-        exchange.sell("VALE", MAX, 10)
-        print("max: ", MAX)
+    if vale_sell[1] + 10 < valbz_buy[3] - 1:
+        exchange.buy("VALE", vale_sell[1] + 1, 10)
+        exchange.convert("VALE", "SELL", 10)
+        exchange.sell("VALBZ", valbz_buy[3] - 1, 10)
 
-    if vale_sell[1] is not None and valbz_buy[3] is not None and vale_sell[1] + 10 < valbz_buy[3] - 1:
-        if state_vale < 10:
-            exchange.buy("VALE", vale_sell[1] + 1, 10)
-        if state_vale == 10:
-            exchange.convert("VALE", "SELL", 10)
-        order_count = abs(sum([x[3] for x in exchange.orders if x[1] == "VALBZ"]))
-        print("VALBZ ORDER COUNT:", order_count)
-        if state_valbz > 0 and order_count <= 10:
-            exchange.sell("VALBZ", valbz_buy[3] - 1, 1)
-
-    elif valbz_sell[1] is not None and vale_buy[3] is not None and valbz_sell[1] + 10 < vale_buy[3] - 1:
-        if state_valbz < 10:
-            exchange.buy("VALBZ", vale_sell[1] + 1, 10)
-        if state_valbz == 10:
-            exchange.convert("VALBZ", "SELL", 10)
-        order_count = abs(sum([x[3] for x in exchange.orders if x[1] == "VALBZ"]))
-        print("VALE ORDER COUNT:", order_count)
-        if state_vale > 0 and order_count <= 10:
-            exchange.sell("VALE", vale_buy[3] - 1, 1)
+    elif valbz_sell[1] + 10 < vale_buy[3] - 1:
+        exchange.buy("VALBZ", vale_sell[1] + 1, 10)
+        exchange.convert("VALBZ", "SELL", 10)
+        exchange.sell("VALE", vale_buy[3] - 1, 1)
 
 def bond_trade(exchange):
     pos = exchange.positions.get("BOND")
@@ -407,8 +374,8 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    threading_wrapper(bond_trade, e, 0.03).start()
-    # threading_wrapper(vale_valbz, e, 0.03).start()
+    # threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(vale_valbz, e, 0.03).start()
     # threading_wrapper(fair_vale, e, 0.06).start()
     threading_wrapper(order_pruning, e, 5).start()
 
