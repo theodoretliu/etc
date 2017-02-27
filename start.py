@@ -150,10 +150,10 @@ class Exchange:
                 cash = self.positions.get("USD", 0)
                 amt = dat["price"] * dat["size"]
                 if dat["dir"] == "BUY":
-                    cur += amt
+                    cur += dat["size"]
                     cash -= amt
                 elif dat["dir"] == "SELL":
-                    cur -= amt
+                    cur -= dat["size"]
                     cash += amt
                 else:
                     print("WTF: not BUY or SELL", file=sys.stderr)
@@ -336,13 +336,18 @@ def convert_xlf(exchange):
 
     price_to_buy = xlf_sell[1]
 
-    print("hello")
-    mult = 7
-    cost_for_others = 3000 + 2*gs_buy[3] + 3*ms_buy[3] + 2*wfc_buy[3]
+    mult = 2
+    cost_for_others = 3*1000 + 2*gs_buy[3] + 3*ms_buy[3] + 2*wfc_buy[3]
     print("price to buy: ", price_to_buy * 10)
     print("cost_for_others: ", cost_for_others)
-    if price_to_buy * 10 - cost_for_others > 100 / (10 * mult):
-        print("cool, a match")
+    if price_to_buy*10 + 100 < cost_for_others:
+        if exchange.positions["XLF"] >= 100 - 10*mult or exchange.positions["BOND"] >= 100 - 3 * mult \
+            or exchange.positions["GS"] >= 100 - 2 * mult or exchange.positions["MS"] >= 100 - 3 * mult \
+            or exchange.positions["WFC"] >= 100 - 2 * mult:
+            print("????")
+            return
+
+        print("LOL")
         exchange.buy("XLF", price_to_buy + 1, 10*mult)
         exchange.convert("XLF", "SELL", 10*mult)
         exchange.sell("BOND", 1001, 3*mult)
