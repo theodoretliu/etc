@@ -225,10 +225,10 @@ def xlf_stuff(e):
 
     owned_shares = e.positions.get("XLF", 0)
     if owned_shares > 50:
-        id_ = e.sell("XLF", fair, 20)
+        id_ = e.sell("XLF", round(fair + 2), 14)
         e.xlf_ordered_sells[id_] = fair
     elif owned_shares < -50:
-        id_ = e.buy("XLF", fair, 20)
+        id_ = e.buy("XLF", round(fair - 2), 14)
         e.xlf_ordered_buys[id_] = fair
 
     buy_offers = sorted(e.fullbook_buys.get("XLF"), key=lambda x: x[0], reverse=True)
@@ -236,14 +236,14 @@ def xlf_stuff(e):
 
     if owned_shares < 95:
         for o in buy_offers:
-            if o[0] < (fair - 1):
+            if o[0] < (fair - 2):
                 id_ = e.buy("XLF", o[0] + 1, min((o[1] + 1) // 2, 10))
                 e.xlf_ordered_buys[id_] = fair
                 break
 
     if owned_shares > -95:
         for o in sell_offers:
-            if o[0] > (fair + 1):
+            if o[0] > (fair + 2):
                 id_ = e.sell("XLF", o[0] - 1, min((o[1] + 1) // 2, 10))
                 e.xlf_ordered_sells[id_] = fair
                 break
@@ -272,9 +272,9 @@ def fair_vale(e):
 
     owned_shares = e.positions.get("VALE", 0)
     if owned_shares > 9:
-        e.sell("VALE", fair, 9)
+        e.sell("VALE", round(fair + 1), 4)
     elif owned_shares < -9:
-        e.buy("VALE", fair, 9)
+        e.buy("VALE", round(fair - 1), 4)
 
     buy_offers = sorted(e.fullbook_buys.get("VALE"), key=lambda x: x[0], reverse=True)
     sell_offers = sorted(e.fullbook_sells.get("VALE"), key=lambda x: x[0])
@@ -298,9 +298,9 @@ def vale_valbz(exchange):
     vale_sell = exchange.sells.get("VALE")
     valbz_sell = exchange.sells.get("VALBZ")
     
-    if any(i == None for i in (vale_sell, vale_buy, valbz_buy, valbz_sell)):
+    if any(i is None for i in (vale_sell, vale_buy, valbz_buy, valbz_sell)):
         return
-    if any(i == None for i in vale_buy + vale_sell + valbz_buy + valbz_sell):
+    if any(i is None for i in vale_buy + vale_sell + valbz_buy + valbz_sell):
         return
 
     state_vale = exchange.positions.get("VALE")
@@ -328,7 +328,7 @@ def convert_xlf(exchange):
     wfc_sell = exchange.sells.get("WFC")
     xlf_buy = exchange.buys.get("XLF")
     xlf_sell = exchange.sells.get("XLF")
-    if any(i == None for i in (xlf_buy, xlf_sell, gs_buy, gs_sell, ms_buy, ms_sell, wfc_buy, wfc_sell)):
+    if any(i is None for i in (xlf_buy, xlf_sell, gs_buy, gs_sell, ms_buy, ms_sell, wfc_buy, wfc_sell)):
         return
 
     if not all(all(x) for x in (gs_buy, ms_buy, wfc_buy, xlf_sell)):
@@ -477,11 +477,11 @@ def main():
 
     e = Exchange()
 
-    # threading_wrapper(bond_trade, e, 0.03).start()
-    # threading_wrapper(vale_valbz, e, 0.03).start()
-    # threading_wrapper(fair_vale, e, 0.06).start()
-    # threading_wrapper(xlf_stuff, e, 0.07).start()
-    threading_wrapper(convert_xlf, e, 0.04).start()
+    threading_wrapper(bond_trade, e, 0.03).start()
+    threading_wrapper(vale_valbz, e, 0.03).start()
+    threading_wrapper(fair_vale, e, 0.06).start()
+    threading_wrapper(xlf_stuff, e, 0.07).start()
+    # threading_wrapper(convert_xlf, e, 0.04).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
