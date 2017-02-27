@@ -348,7 +348,7 @@ def convert_xlf(exchange):
             return
 
         print("LOL")
-        exchange.buy("XLF", price_to_buy + 1, 10*mult)
+        exchange.buy("XLF", price_to_buy + 2, 10*mult)
         exchange.convert("XLF", "SELL", 10*mult)
         exchange.sell("BOND", 1001, 3*mult)
         exchange.sell("GS", gs_buy[3] - 1, 2*mult)
