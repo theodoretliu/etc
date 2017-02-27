@@ -443,7 +443,7 @@ def main():
     threading_wrapper(bond_trade, e, 0.03).start()
     threading_wrapper(vale_valbz, e, 0.03).start()
     threading_wrapper(fair_vale, e, 0.06).start()
-    threading_wrapper(xlf_stuff, e, 0.07).start()
+    # threading_wrapper(xlf_stuff, e, 0.07).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
