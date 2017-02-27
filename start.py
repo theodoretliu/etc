@@ -328,14 +328,21 @@ def convert_xlf(exchange):
     wfc_sell = exchange.sells.get("WFC")
     xlf_buy = exchange.buys.get("XLF")
     xlf_sell = exchange.sells.get("XLF")
-    if any(i == None in (xlf_buy, xlf_sell, gs_buy, gs_sell, ms_buy, ms_sell, wfc_buy, wfc_sell)):
+    if any(i == None for i in (xlf_buy, xlf_sell, gs_buy, gs_sell, ms_buy, ms_sell, wfc_buy, wfc_sell)):
+        return
+
+    if not all(all(x) for x in (gs_buy, ms_buy, wfc_buy, xlf_sell)):
         return
 
     price_to_buy = xlf_sell[1]
 
-    mult = 3
+    print("hello")
+    mult = 7
     cost_for_others = 3000 + 2*gs_buy[3] + 3*ms_buy[3] + 2*wfc_buy[3]
-    if price_to_buy - cost_for_others > 11:
+    print("price to buy: ", price_to_buy * 10)
+    print("cost_for_others: ", cost_for_others)
+    if price_to_buy * 10 - cost_for_others > 100 / (10 * mult):
+        print("cool, a match")
         exchange.buy("XLF", price_to_buy + 1, 10*mult)
         exchange.convert("XLF", "SELL", 10*mult)
         exchange.sell("BOND", 1001, 3*mult)
@@ -465,10 +472,11 @@ def main():
 
     e = Exchange()
 
-    threading_wrapper(bond_trade, e, 0.03).start()
-    threading_wrapper(vale_valbz, e, 0.03).start()
-    threading_wrapper(fair_vale, e, 0.06).start()
-    threading_wrapper(xlf_stuff, e, 0.07).start()
+    # threading_wrapper(bond_trade, e, 0.03).start()
+    # threading_wrapper(vale_valbz, e, 0.03).start()
+    # threading_wrapper(fair_vale, e, 0.06).start()
+    # threading_wrapper(xlf_stuff, e, 0.07).start()
+    threading_wrapper(convert_xlf, e, 0.04).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
