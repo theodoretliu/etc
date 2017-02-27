@@ -46,6 +46,14 @@ class Exchange:
         self.vale_ordered_buys = {}  # order_id -> fair_val
         self.vale_ordered_sells = {}  # order_id -> fair_val
 
+
+        # xlf stuff
+        self.gs_rolling = deque(maxlen=100)
+        self.ms_rolling = deque(maxlen=100)
+        self.wfc_rolling = deque(maxlen=100)
+        self.xlf_ordered_buys = {}  # order_id -> fair_val
+        self.xlf_ordered_sells = {}  # order_id -> fair_val
+
         self.write({"type": "hello", "team": "BIGBOARDTRIO"})
 
     def read(self):
@@ -154,9 +162,15 @@ class Exchange:
             elif msg_type == "ack":
                 print("ACK", dat["order_id"])
             elif msg_type == "trade":
-                if dat["symbol"] == "VALBZ":
+                sym = dat["symbol"]
+                if sym == "VALBZ":
                     self.valbz_rolling.append(dat["price"])
-
+                elif sym == "GS":
+                    self.gs_rolling.append(dat["price"])
+                elif sym == "MS":
+                    self.ms_rolling.append(dat["price"])
+                elif sym == "WFC":
+                    self.wfc_rolling.append(dat["price"])
 
 
 def order_pruning(exchange):
@@ -182,6 +196,57 @@ def confirm(exchange, sym, direction):
         elif direction == "DOWN" and pos < last:
             break
         time.sleep(0.001)
+
+
+def xlf_stuff(e):
+    if len(e.gs_rolling) < 5 or len(e.ms_rolling) < 5 or len(e.wfc_rolling) < 5:
+        return
+
+    m_gs = sum(e.gs_rolling) / len(e.gs_rolling)
+    m_ms = sum(e.ms_rolling) / len(e.ms_rolling)
+    m_wfc = sum(e.wfc_rolling) / len(e.wfc_rolling)
+
+    fair = (3000 + 2 * m_gs + 3 * m_ms + 2 * m_wfc) / 10
+
+    to_remove = (e.xlf_ordered_buys.keys() | e.xlf_ordered_sells.keys()) - e.orders_dict.keys()
+    for r in to_remove:
+        e.xlf_ordered_buys.pop(r, None)
+        e.xlf_ordered_sells.pop(r, None)
+
+    for id_, old_fair in e.xlf_ordered_buys.items():
+        diff = fair - old_fair
+        if diff > 16 or diff < -1:
+            e.cancel(id_)
+
+    for id_, old_fair in e.xlf_ordered_sells.items():
+        diff = fair - old_fair
+        if diff < -16 or diff > 1:
+            e.cancel(id_)
+
+    owned_shares = e.positions.get("XLF", 0)
+    if owned_shares > 50:
+        id_ = e.sell("XLF", fair, 20)
+        e.xlf_ordered_sells[id_] = fair
+    elif owned_shares < -50:
+        id_ = e.buy("XLF", fair, 20)
+        e.xlf_ordered_buys[id_] = fair
+
+    buy_offers = sorted(e.fullbook_buys.get("XLF"), key=lambda x: x[0], reverse=True)
+    sell_offers = sorted(e.fullbook_sells.get("XLF"), key=lambda x: x[0])
+
+    if owned_shares < 95:
+        for o in buy_offers:
+            if o[0] < (fair - 1):
+                id_ = e.buy("XLF", o[0] + 1, min((o[1] + 1) // 2, 10))
+                e.xlf_ordered_buys[id_] = fair
+                break
+
+    if owned_shares > -95:
+        for o in sell_offers:
+            if o[0] > (fair + 1):
+                id_ = e.sell("XLF", o[0] - 1, min((o[1] + 1) // 2, 10))
+                e.xlf_ordered_sells[id_] = fair
+                break
 
 
 def fair_vale(e):
@@ -374,9 +439,11 @@ def main():
         print("--- TEST ---")
 
     e = Exchange()
-    # threading_wrapper(bond_trade, e, 0.03).start()
+
+    threading_wrapper(bond_trade, e, 0.03).start()
     threading_wrapper(vale_valbz, e, 0.03).start()
-    # threading_wrapper(fair_vale, e, 0.06).start()
+    threading_wrapper(fair_vale, e, 0.06).start()
+    threading_wrapper(xlf_stuff, e, 0.07).start()
     threading_wrapper(order_pruning, e, 5).start()
 
     s = None
