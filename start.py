@@ -319,6 +319,31 @@ def vale_valbz(exchange):
         exchange.convert("VALBZ", "SELL", 10)
         exchange.sell("VALE", vale_buy[3] - 1, 1)
 
+def convert_xlf(exchange):
+    gs_buy = exchange.buys.get("GS")
+    gs_sell = exchange.sells.get("GS")
+    ms_buy = exchange.buys.get("MS")
+    ms_sell = exchange.sells.get("MS")
+    wfc_buy = exchange.buys.get("WFC")
+    wfc_sell = exchange.sells.get("WFC")
+    xlf_buy = exchange.buys.get("XLF")
+    xlf_sell = exchange.sells.get("XLF")
+    if any(i == None in (xlf_buy, xlf_sell, gs_buy, gs_sell, ms_buy, ms_sell, wfc_buy, wfc_sell)):
+        return
+
+    price_to_buy = xlf_sell[1]
+
+    mult = 3
+    cost_for_others = 3000 + 2*gs_buy[3] + 3*ms_buy[3] + 2*wfc_buy[3]
+    if price_to_buy - cost_for_others > 11:
+        exchange.buy("XLF", price_to_buy + 1, 10*mult)
+        exchange.convert("XLF", "SELL", 10*mult)
+        exchange.sell("BOND", 1001, 3*mult)
+        exchange.sell("GS", gs_buy[3] - 1, 2*mult)
+        exchange.sell("MS", ms_buy[3] - 1, 3*mult)
+        exchange.sell("WFC", wfc_buy[3] - 1, 2*mult)
+
+
 def bond_trade(exchange):
     pos = exchange.positions.get("BOND")
     if pos is None:
